@@ -38,6 +38,18 @@ app.get("/users", async(req, res) => {
     res.send(result) 
 })
 
+//jobs related api
+app.post("/jobs", async(req, res) => {
+  const job = req.body;
+  const result = await jobsCollection.insertOne(job);
+  res.send(result)
+})
+
+app.get("/jobs", async(req, res) => {
+   const result = await jobsCollection.find().toArray();
+    res.send(result)
+})
+
 app.listen(PORT, () => {
     console.log(`hire loop is runnig on port ${PORT}`);
 })
