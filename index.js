@@ -57,6 +57,20 @@ app.delete("/jobs/:id", async(req, res) => {
     res.send(result);
 })
 
+
+// update jobs
+app.patch("/jobs/:id", async (req, res) => {
+  const id = req.params.id;
+  const updatedJob = req.body;
+  delete updatedJob._id;
+  const result = await jobsCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: updatedJob }
+  );
+  res.send(result);
+});
+
+
 app.listen(PORT, () => {
     console.log(`hire loop is runnig on port ${PORT}`);
 })
