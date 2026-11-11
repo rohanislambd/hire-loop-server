@@ -45,10 +45,34 @@ app.post("/jobs", async(req, res) => {
   res.send(result)
 })
 
-app.get("/jobs", async(req, res) => {
-   const result = await jobsCollection.find().toArray();
-    res.send(result)
-})
+
+app.get("/jobs", async (req, res) => {
+  const query = {};
+
+  console.log("query", req.query);
+
+  if (req.query.jobType) {
+    query.jobType = req.query.jobType;
+  }
+
+  if (req.query.isRemote) {
+    query.isRemote = req.query.isRemote === "true";
+  }
+
+  // Search filter
+  if (req.query.search) {
+    query.$or = [
+      { title: { $regex: req.query.search, $options: "i" } },
+      { responsibilities: { $regex: req.query.search, $options: "i" } },
+      { qualifications: { $regex: req.query.search, $options: "i" } }
+    ];
+  }
+
+  const result = await jobsCollection.find(query).toArray();
+
+  res.send(result);
+});
+
 
 // delete jobs
 app.delete("/jobs/:id", async(req, res) => {
