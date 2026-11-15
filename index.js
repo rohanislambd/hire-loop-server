@@ -27,6 +27,7 @@ const connectedClient = await connectToMongoDB()
 const db = connectedClient.db("hireloop");
 const usersCollectin = db.collection("user")
 const jobsCollection = db.collection("jobs")
+const applicationCollection = db.collection("applications")
 
 app.get("/", (req, res) => {
     res.send({message: "hire loop is looping"})
@@ -46,23 +47,35 @@ app.post("/jobs", async(req, res) => {
 })
 
 
+
 app.get("/jobs", async (req, res) => {
   const query = {};
 
   console.log("query", req.query);
 
   if (req.query.jobType) {
-    query.jobType = req.query.jobType;
+    query.jobType = {
+      $regex: `^${req.query.jobType}$`,
+      $options: "i"
+    };
   }
 
   if (req.query.isRemote) {
     query.isRemote = req.query.isRemote === "true";
   }
 
+  if (req.query.category) {
+    query.category = {
+      $regex: `${req.query.category}`,
+      $options: "i"
+    };
+  }
+
   // Search filter
   if (req.query.search) {
     query.$or = [
       { title: { $regex: req.query.search, $options: "i" } },
+      { company: { $regex: req.query.search, $options: "i" } },
       { responsibilities: { $regex: req.query.search, $options: "i" } },
       { qualifications: { $regex: req.query.search, $options: "i" } }
     ];
@@ -73,6 +86,14 @@ app.get("/jobs", async (req, res) => {
   res.send(result);
 });
 
+
+
+app.get('/jobs/:id', async(req, res)=>{
+  const id = req.params.id;
+  const query = {_id: new ObjectId(id)}
+  const result = await jobsCollection.findOne(query);
+  res.send(result)
+})
 
 // delete jobs
 app.delete("/jobs/:id", async(req, res) => {
@@ -94,6 +115,24 @@ app.patch("/jobs/:id", async (req, res) => {
   res.send(result);
 });
 
+
+//application related api
+app.post('/applications', async(req, res)=> {
+  const application = req.body
+  const result = await applicationCollection.insertOne(application);
+  res.send(result)
+})
+
+app.get('/applications', async(req, res) => {
+
+    const query = {}
+    
+    if(req.query.applicantId) {
+      query.userId = req.query.applicantId
+    }
+    const result =await applicationCollection.find(query).toArray();
+    res.send(result)
+})
 
 app.listen(PORT, () => {
     console.log(`hire loop is runnig on port ${PORT}`);
