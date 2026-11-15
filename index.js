@@ -2,6 +2,10 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import { MongoClient, ObjectId } from "mongodb";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -27,6 +31,7 @@ const db = connectedClient.db("hireloop");
 const usersCollectin = db.collection("user");
 const jobsCollection = db.collection("jobs");
 const applicationCollection = db.collection("applications");
+const paymentCollection = db.collection("payments");
 
 app.get("/", (req, res) => {
   res.send({ message: "hire loop is looping" });
@@ -132,8 +137,57 @@ app.get("/applications/count", async (req, res) => {
   if (req.query.applicantId) {
     query.userId = req.query.applicantId;
   }
-   const count = await applicationCollection.countDocuments(query)
-  res.send({count});
+  const count = await applicationCollection.countDocuments(query);
+  res.send({ count });
+});
+
+// payment releted api
+app.post("/payments/checkout-verify", async (req, res) => {
+  const { sessionId } = req.body;
+  if(!sessionId){
+    return res.send({success:false, message:"Session ID is required"})
+  }
+  const { status, customer_email, metadata, payment_intent, payment_status } =
+    await stripe.checkout.sessions.retrieve(sessionId);
+
+  // 1. is used new session
+  // 2. check ins the session id for the currently logged in user
+  // 3. insert sessionId into the payment collection
+  // 4. update user information as premium user
+
+  if (status === "complete" && payment_status === "paid") {
+
+   const sessionQuery = {sessionId};
+
+   const exitingPayment = await paymentCollection.findOne(sessionQuery);
+   if(exitingPayment){
+    return res.send({success: false, message: "Payment already verified"})
+   }
+
+    const payment = {
+      sessionId,
+      status,
+      payment_status,
+      userId: metadata.userId,
+      payment_date: new Date(),
+      payment_intent,
+    };
+    const result = await paymentCollection.insertOne(payment);
+    // update the user table
+
+    const updateDoc = {
+      $set: {
+        premium: true,
+      },
+    };
+    const updateResult = await usersCollectin.updateOne(
+      { _id: new ObjectId(metadata.userId) },
+      updateDoc,
+    );
+    res.send({ success: true, result, updateResult });
+    return;
+  }
+  res.send({ success: false, message: "payment verificaiton failed" });
 });
 
 app.listen(PORT, () => {
