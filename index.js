@@ -13,6 +13,13 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+const myLogger = (req, res, next)=> {
+  console.log('now hitting api', req.url, req.query)
+  next()
+}
+
+
+
 //mongodb database
 
 const client = new MongoClient(process.env.MONGODB_URI);
@@ -29,13 +36,46 @@ export async function connectToMongoDB() {
 const connectedClient = await connectToMongoDB();
 const db = connectedClient.db("hireloop");
 const usersCollectin = db.collection("user");
+const sessionCollectin = db.collection("session");
 const jobsCollection = db.collection("jobs");
 const applicationCollection = db.collection("applications");
 const paymentCollection = db.collection("payments");
 
+
 app.get("/", (req, res) => {
   res.send({ message: "hire loop is looping" });
 });
+
+const verifyToken = async(req, res, next)=> {
+    const authHeader = req.headers.authorization;
+    if(!authHeader){
+      res.status(401).send({message: "Unauthorized"})
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+     if(!token){
+      res.status(401).send({message: "Unauthorized"})
+      return;
+    }
+
+    const query = {token};
+    const session = await sessionCollectin.findOne(query);
+    if(!session){
+      res.status(401).send({message:"Unauthorized"})
+      return;
+    }
+    const userId = session.userId
+    const userQuery = {_id: new ObjectId(userId)}
+    const user = await usersCollectin.findOne(userQuery);
+    if(!user){
+       res.status(401).send({message:"Unauthorized"})
+      return;
+    }
+
+    req.user = user
+    next()
+}
 
 // users related api
 app.get("/users", async (req, res) => {
@@ -145,13 +185,20 @@ app.post("/applications", async (req, res) => {
   res.send(result);
 });
 
-app.get("/applications", async (req, res) => {
+app.get("/applications",verifyToken, async (req, res) => {
+ 
+
   const query = {};
 
   if (req.query.applicantId) {
     query.userId = req.query.applicantId;
   }
   if(req.query.jobId){
+     const jobQuery = {_id: new ObjectId(req.query.jobId)}
+     const job = await jobsCollection.findOne(jobQuery);
+     if(job.recruiterId !== req.user._id.toString() && req.user.role !== "admin"){  
+          res.status(403).send({message: "Forbidden"})   
+     }
     query.jobId = req.query.jobId
   }
   const result = await applicationCollection.find(query).toArray();
