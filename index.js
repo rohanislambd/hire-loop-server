@@ -76,6 +76,22 @@ const verifyToken = async(req, res, next)=> {
     req.user = user
     next()
 }
+//must call this middleware after veriifyToken
+const verifySeeker = async(req, res, next) => {
+  if(req.user.role !== "seeker"){
+    res.status(403).send({message: "Forbidden"})
+    return ;
+  }
+  next()
+}
+
+const verifyRecruiter = async(req, res, next)=>{
+   if(req.user.role !== "recruiter"){
+     res.status(403).send({message: "Forbidden"})
+    return ;
+   }
+   next()
+}
 
 // users related api
 app.get("/users", async (req, res) => {
@@ -105,7 +121,7 @@ app.patch('/users/:id/role', async(req, res) =>{
 })
 
 //jobs related api
-app.post("/jobs", async (req, res) => {
+app.post("/jobs",verifyToken,verifyRecruiter, async (req, res) => {
   const job = req.body;
   const result = await jobsCollection.insertOne(job);
   res.send(result);
@@ -179,7 +195,7 @@ app.patch("/jobs/:id", async (req, res) => {
 });
 
 //application related api
-app.post("/applications", async (req, res) => {
+app.post("/applications",verifyToken, verifySeeker, async (req, res) => {
   const application = req.body;
   const result = await applicationCollection.insertOne(application);
   res.send(result);
