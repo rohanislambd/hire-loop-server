@@ -37,11 +37,32 @@ app.get("/", (req, res) => {
   res.send({ message: "hire loop is looping" });
 });
 
-//load users
+// users related api
 app.get("/users", async (req, res) => {
   const result = await usersCollectin.find({}).toArray();
   res.send(result);
 });
+
+
+app.get("/users/:id/premium", async(req, res) =>{
+    const id = req.params.id
+    const query = {_id: new ObjectId(id)};
+    const result = await usersCollectin.findOne(query, {projection:{premium: 1}});
+    // console.log(result);
+    res.send(result)
+})
+
+app.patch('/users/:id/role', async(req, res) =>{
+  const id = req.params.id;
+  const query = {_id:  new ObjectId(id)};
+  const updateDoc = {
+    $set:{
+      role: req.body.role
+    }
+  }
+  const result = await usersCollectin.updateOne(query, updateDoc);
+  res.send(result)
+})
 
 //jobs related api
 app.post("/jobs", async (req, res) => {
@@ -71,6 +92,9 @@ app.get("/jobs", async (req, res) => {
       $regex: `${req.query.category}`,
       $options: "i",
     };
+  }
+  if(req.query.recruiterId){
+    query.recruiterId = req.query.recruiterId
   }
 
   // Search filter
@@ -127,6 +151,9 @@ app.get("/applications", async (req, res) => {
   if (req.query.applicantId) {
     query.userId = req.query.applicantId;
   }
+  if(req.query.jobId){
+    query.jobId = req.query.jobId
+  }
   const result = await applicationCollection.find(query).toArray();
   res.send(result);
 });
@@ -141,6 +168,18 @@ app.get("/applications/count", async (req, res) => {
   res.send({ count });
 });
 
+
+app.patch("/applications/:id", async (req, res) => {
+    const id = req.params.id
+    const query =  {_id: new ObjectId(id)};
+    const updateDoc = {
+      $set: {
+        status: req.body.status
+      }
+    }
+    const result = await applicationCollection.updateOne(query, updateDoc)
+    res.send(result);
+})
 // payment releted api
 app.post("/payments/checkout-verify", async (req, res) => {
   const { sessionId } = req.body;
@@ -167,6 +206,7 @@ app.post("/payments/checkout-verify", async (req, res) => {
     const payment = {
       sessionId,
       status,
+      customer_email,
       payment_status,
       userId: metadata.userId,
       payment_date: new Date(),
