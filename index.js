@@ -13,10 +13,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const myLogger = (req, res, next)=> {
-  console.log('now hitting api', req.url, req.query)
-  next()
-}
+
 
 
 
@@ -48,6 +45,7 @@ app.get("/", (req, res) => {
 
 const verifyToken = async(req, res, next)=> {
     const authHeader = req.headers.authorization;
+    
     if(!authHeader){
       res.status(401).send({message: "Unauthorized"})
       return;
@@ -101,13 +99,13 @@ const verifyAdmin= async(req, res, next)=>{
 }
 
 // users related api
-app.get("/users", async (req, res) => {
+app.get("/users",verifyToken, verifyAdmin, async (req, res) => {
   const result = await usersCollectin.find({}).toArray();
   res.send(result);
 });
 
 
-app.get("/users/:id/premium", async(req, res) =>{
+app.get("/users/:id/premium",verifyToken,verifySeeker, async(req, res) =>{
     const id = req.params.id
     const query = {_id: new ObjectId(id)};
     const result = await usersCollectin.findOne(query, {projection:{premium: 1}});
@@ -117,7 +115,7 @@ app.get("/users/:id/premium", async(req, res) =>{
 
 app.patch('/users/:id/role',verifyToken,verifyAdmin, async(req, res) =>{
   const id = req.params.id;
-  const query = {_id:  new ObjectId(id)};
+  const query = {_id: new ObjectId(id)};
   const updateDoc = {
     $set:{
       role: req.body.role
@@ -137,7 +135,7 @@ app.post("/jobs",verifyToken,verifyRecruiter, async (req, res) => {
 app.get("/jobs", async (req, res) => {
   const query = {};
 
-  console.log("query", req.query);
+  // console.log("query", req.query);
 
   if (req.query.jobType) {
     query.jobType = {
@@ -251,7 +249,7 @@ app.patch("/applications/:id", async (req, res) => {
     res.send(result);
 })
 // payment releted api
-app.post("/payments/checkout-verify", async (req, res) => {
+app.post("/payments/checkout-verify",verifyToken, async (req, res) => {
   const { sessionId } = req.body;
   if(!sessionId){
     return res.send({success:false, message:"Session ID is required"})
